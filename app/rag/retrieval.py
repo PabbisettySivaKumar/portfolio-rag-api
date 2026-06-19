@@ -22,8 +22,12 @@ class RetrievedChunk:
 
 def search_chunks(query_embedding: list[float]) -> list[RetrievedChunk]:
     cypher = """
-    CALL db.index.vector.queryNodes('portfolio_chunk_embedding', $top_k, $embedding)
-    YIELD node, score
+    MATCH (node:DocumentChunk)
+    SEARCH node IN (
+        VECTOR INDEX portfolio_chunk_embedding FOR $embedding
+        LIMIT $top_k
+    )
+    SCORE AS score
     RETURN
       node.title AS title,
       node.content AS content,
