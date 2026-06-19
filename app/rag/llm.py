@@ -32,3 +32,20 @@ def generate_answer(messages: list[dict[str, str]]) -> str:
     if isinstance(message, dict):
         return message.get("content", "")
     return message.content or ""
+
+
+def generate_answer_stream(messages: list[dict[str, str]]):
+    _ensure_gemini_key()
+    response = completion(
+        model=settings.litellm_chat_model,
+        messages=messages,
+        stream=True,
+    )
+    for chunk in response:
+        delta = chunk.choices[0].delta
+        if isinstance(delta, dict):
+            content = delta.get("content", "")
+        else:
+            content = getattr(delta, "content", "") or ""
+        if content:
+            yield content

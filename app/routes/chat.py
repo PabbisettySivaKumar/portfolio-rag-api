@@ -1,10 +1,12 @@
+import json
 import logging
 
 from fastapi import APIRouter
+from fastapi.responses import StreamingResponse
 
-from app.models import ChatMessage, ChatRequest, ChatResponse, Source
+from app.models import ChatMessage, ChatRequest, Source
 from app.rag.guardrails import OUT_OF_SCOPE_RESPONSE, is_portfolio_question
-from app.rag.llm import embed_text, generate_answer
+from app.rag.llm import embed_text, generate_answer_stream
 from app.rag.prompts import ANSWER_SYSTEM_PROMPT, CONDENSE_SYSTEM_PROMPT
 from app.rag.retrieval import RetrievedChunk, search_chunks
 
@@ -40,9 +42,10 @@ Formulate a standalone question that captures the user's intent without referrin
     ]
 
     try:
-        condensed = generate_answer(messages).strip()
-        logger.info(f"Condensed question: '{question}' -> '{condensed}'")
-        return condensed
+        condensed = generate_answer_stream(messages)
+        condensed_str = "".join(list(condensed)).strip()
+        logger.info(f"Condensed question: '{question}' -> '{condensed_str}'")
+        return condensed_str
     except Exception:
         logger.exception("Failed to condense question, falling back to raw question")
         return question
@@ -101,31 +104,46 @@ def _sources_from_chunks(chunks: list[RetrievedChunk]) -> list[Source]:
     ]
 
 
-@router.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest) -> ChatResponse:
+@router.post("/chat")
+def chat(request: ChatRequest) -> StreamingResponse:
     question = request.message.strip()
     history = request.history
 
-    # 1. Condense the question based on context history
-    condensed_question = _condense_question(question, history)
+    def event_generator():
+        try:
+            # 1. Condense the question based on context history
+            condensed_question = _condense_question(question, history)
+        except Exception:
+            logger.exception("Failed to condense question")
+            condensed_question = question
 
-    # 2. Run guardrails on the condensed standalone question
-    if not is_portfolio_question(condensed_question):
-        return ChatResponse(answer=OUT_OF_SCOPE_RESPONSE, sources=[])
+        # 2. Run guardrails on the condensed standalone question
+        if not is_portfolio_question(condensed_question):
+            yield json.dumps({"type": "token", "content": OUT_OF_SCOPE_RESPONSE}) + "\n"
+            yield json.dumps({"type": "sources", "sources": []}) + "\n"
+            return
 
-    try:
-        # 3. Search database using the condensed question
-        query_embedding = embed_text(condensed_question)
-        chunks = search_chunks(query_embedding)
+        try:
+            # 3. Search database using the condensed question
+            query_embedding = embed_text(condensed_question)
+            chunks = search_chunks(query_embedding)
 
-        if not chunks:
-            return ChatResponse(answer=NO_CONTEXT_RESPONSE, sources=[])
+            if not chunks:
+                yield json.dumps({"type": "token", "content": NO_CONTEXT_RESPONSE}) + "\n"
+                yield json.dumps({"type": "sources", "sources": []}) + "\n"
+                return
 
-        # 4. Generate answer using raw question + context + history
-        answer_messages = _build_messages(question, chunks, history)
-        answer = generate_answer(answer_messages)
-        
-        return ChatResponse(answer=answer, sources=_sources_from_chunks(chunks))
-    except Exception:
-        logger.exception("Chat request failed")
-        return ChatResponse(answer=ERROR_RESPONSE, sources=[])
+            # Yield sources list immediately
+            sources_payload = _sources_from_chunks(chunks)
+            sources_list = [{"title": s.title, "snippet": s.snippet} for s in sources_payload]
+            yield json.dumps({"type": "sources", "sources": sources_list}) + "\n"
+
+            # 4. Generate answer using raw question + context + history
+            answer_messages = _build_messages(question, chunks, history)
+            for token in generate_answer_stream(answer_messages):
+                yield json.dumps({"type": "token", "content": token}) + "\n"
+        except Exception:
+            logger.exception("Chat request failed during streaming")
+            yield json.dumps({"type": "error", "content": ERROR_RESPONSE}) + "\n"
+
+    return StreamingResponse(event_generator(), media_type="application/x-ndjson")
