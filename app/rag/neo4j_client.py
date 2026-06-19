@@ -1,10 +1,26 @@
-from neo4j import GraphDatabase
+import logging
+from neo4j import AsyncGraphDatabase
 
 from app.config import settings
 
+logger = logging.getLogger(__name__)
+_driver = None
+
 
 def get_driver():
-    return GraphDatabase.driver(
-        settings.neo4j_uri,
-        auth=(settings.neo4j_username, settings.neo4j_password),
-    )
+    global _driver
+    if _driver is None:
+        logger.info("Initializing Async Neo4j GraphDatabase driver instance")
+        _driver = AsyncGraphDatabase.driver(
+            settings.neo4j_uri,
+            auth=(settings.neo4j_username, settings.neo4j_password),
+        )
+    return _driver
+
+
+async def close_driver() -> None:
+    global _driver
+    if _driver is not None:
+        logger.info("Closing Async Neo4j GraphDatabase driver instance")
+        await _driver.close()
+        _driver = None

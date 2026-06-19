@@ -5,8 +5,9 @@ from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
 from app.models import ChatMessage, ChatRequest, Source
+from app.rag.cache import query_cache
 from app.rag.guardrails import OUT_OF_SCOPE_RESPONSE, is_portfolio_question
-from app.rag.llm import embed_text, generate_answer_stream
+from app.rag.llm import embed_text, generate_answer, generate_answer_stream
 from app.rag.prompts import ANSWER_SYSTEM_PROMPT, CONDENSE_SYSTEM_PROMPT
 from app.rag.retrieval import RetrievedChunk, search_chunks
 
@@ -21,7 +22,7 @@ ERROR_RESPONSE = (
 )
 
 
-def _condense_question(question: str, history: list[ChatMessage]) -> str:
+async def _condense_question(question: str, history: list[ChatMessage]) -> str:
     if not history:
         return question
 
@@ -42,8 +43,8 @@ Formulate a standalone question that captures the user's intent without referrin
     ]
 
     try:
-        condensed = generate_answer_stream(messages)
-        condensed_str = "".join(list(condensed)).strip()
+        condensed_str = await generate_answer(messages)
+        condensed_str = condensed_str.strip()
         logger.info(f"Condensed question: '{question}' -> '{condensed_str}'")
         return condensed_str
     except Exception:
@@ -105,14 +106,23 @@ def _sources_from_chunks(chunks: list[RetrievedChunk]) -> list[Source]:
 
 
 @router.post("/chat")
-def chat(request: ChatRequest) -> StreamingResponse:
+async def chat(request: ChatRequest) -> StreamingResponse:
     question = request.message.strip()
     history = request.history
 
-    def event_generator():
+    async def event_generator():
+        # Check cache
+        cache_key = f"{question}|||{json.dumps([h.dict() if hasattr(h, 'dict') else h.model_dump() for h in history])}"
+        cached = query_cache.get(cache_key)
+        if cached is not None:
+            logger.info("Cache hit for query")
+            yield json.dumps({"type": "sources", "sources": cached["sources"]}) + "\n"
+            yield json.dumps({"type": "token", "content": cached["answer"]}) + "\n"
+            return
+
         try:
             # 1. Condense the question based on context history
-            condensed_question = _condense_question(question, history)
+            condensed_question = await _condense_question(question, history)
         except Exception:
             logger.exception("Failed to condense question")
             condensed_question = question
@@ -125,8 +135,8 @@ def chat(request: ChatRequest) -> StreamingResponse:
 
         try:
             # 3. Search database using the condensed question
-            query_embedding = embed_text(condensed_question)
-            chunks = search_chunks(query_embedding)
+            query_embedding = await embed_text(condensed_question)
+            chunks = await search_chunks(query_embedding)
 
             if not chunks:
                 yield json.dumps({"type": "token", "content": NO_CONTEXT_RESPONSE}) + "\n"
@@ -140,8 +150,14 @@ def chat(request: ChatRequest) -> StreamingResponse:
 
             # 4. Generate answer using raw question + context + history
             answer_messages = _build_messages(question, chunks, history)
-            for token in generate_answer_stream(answer_messages):
+            accumulated_answer = ""
+            async for token in generate_answer_stream(answer_messages):
+                accumulated_answer += token
                 yield json.dumps({"type": "token", "content": token}) + "\n"
+
+            # Cache the response
+            if accumulated_answer.strip():
+                query_cache.set(cache_key, {"sources": sources_list, "answer": accumulated_answer})
         except Exception:
             logger.exception("Chat request failed during streaming")
             yield json.dumps({"type": "error", "content": ERROR_RESPONSE}) + "\n"

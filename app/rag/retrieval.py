@@ -20,7 +20,7 @@ class RetrievedChunk:
         return f"{normalized[:257].rstrip()}..."
 
 
-def search_chunks(query_embedding: list[float]) -> list[RetrievedChunk]:
+async def search_chunks(query_embedding: list[float]) -> list[RetrievedChunk]:
     cypher = """
     MATCH (node:DocumentChunk)
     SEARCH node IN (
@@ -37,12 +37,13 @@ def search_chunks(query_embedding: list[float]) -> list[RetrievedChunk]:
     ORDER BY score DESC
     """
 
-    with get_driver() as driver:
-        records = driver.execute_query(
-            cypher,
-            top_k=settings.rag_top_k,
-            embedding=query_embedding,
-        ).records
+    driver = get_driver()
+    res = await driver.execute_query(
+        cypher,
+        top_k=settings.rag_top_k,
+        embedding=query_embedding,
+    )
+    records = res.records
 
     chunks = [
         RetrievedChunk(

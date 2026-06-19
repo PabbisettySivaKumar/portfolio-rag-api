@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 CONTENT_DIR = BACKEND_DIR / "content"
@@ -20,7 +20,7 @@ os.chdir(BACKEND_DIR)
 from app.config import settings  # noqa: E402
 from app.rag.chunking import chunk_text  # noqa: E402
 from app.rag.llm import embed_text  # noqa: E402
-from app.rag.neo4j_client import get_driver  # noqa: E402
+from app.rag.neo4j_client import close_driver, get_driver  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -98,104 +98,136 @@ def _chunk_id(source: str, chunk_index: int, content: str) -> str:
     return digest[:24]
 
 
-def _embed_documents(documents: list[SourceDocument]) -> list[EmbeddedChunk]:
-    embedded: list[EmbeddedChunk] = []
-
-    for document in documents:
-        chunks = chunk_text(document.text)
-        print(f"Chunking {document.path.name}: {len(chunks)} chunk(s)")
-
-        for chunk_index, content in enumerate(chunks):
-            print(f"Embedding {document.path.name} chunk {chunk_index + 1}/{len(chunks)}")
-            embedded.append(
-                EmbeddedChunk(
-                    id=_chunk_id(document.path.name, chunk_index, content),
-                    title=document.title,
-                    source=document.path.name,
-                    section=document.section,
-                    content=content,
-                    chunk_index=chunk_index,
-                    embedding=embed_text(content),
-                )
-            )
-
-    if not embedded:
-        raise SystemExit("No chunks were generated for ingestion")
-
-    return embedded
-
-
-def _create_vector_index(dimension: int) -> None:
-    cypher = f"""
-    CREATE VECTOR INDEX {INDEX_NAME} IF NOT EXISTS
-    FOR (c:{CHUNK_LABEL})
-    ON (c.embedding)
-    OPTIONS {{
-      indexConfig: {{
-        `vector.dimensions`: {dimension},
-        `vector.similarity_function`: 'cosine'
-      }}
-    }}
-    """
-
-    with get_driver() as driver:
-        with driver.session() as session:
-            session.run(f"DROP INDEX {INDEX_NAME} IF EXISTS")
-            session.run(cypher)
-            session.run("CALL db.awaitIndexes(300)")
-
-
-def _write_chunks(chunks: list[EmbeddedChunk]) -> None:
-    rows = [
-        {
-            "id": chunk.id,
-            "title": chunk.title,
-            "source": chunk.source,
-            "section": chunk.section,
-            "content": chunk.content,
-            "chunk_index": chunk.chunk_index,
-            "embedding": chunk.embedding,
-        }
-        for chunk in chunks
-    ]
-
-    cypher = f"""
-    UNWIND $rows AS row
-    CREATE (c:{CHUNK_LABEL})
-    SET
-      c.id = row.id,
-      c.title = row.title,
-      c.source = row.source,
-      c.section = row.section,
-      c.content = row.content,
-      c.chunk_index = row.chunk_index,
-      c.embedding = row.embedding,
-      c.ingested_at = datetime()
-    """
-
-    with get_driver() as driver:
-        with driver.session() as session:
-            session.run(f"MATCH (c:{CHUNK_LABEL}) DETACH DELETE c")
-            session.run(cypher, rows=rows)
-
-
-def main() -> None:
+async def main() -> None:
     _require_env()
     documents = _read_documents()
-    chunks = _embed_documents(documents)
-    dimension = len(chunks[0].embedding)
 
-    if dimension <= 0:
-        raise SystemExit("Embedding model returned an empty vector")
+    # Calculate content hashes for local documents
+    local_hashes = {}
+    for doc in documents:
+        local_hashes[doc.path.name] = hashlib.sha256(doc.text.encode("utf-8")).hexdigest()
 
-    print(f"Creating Neo4j vector index '{INDEX_NAME}' with dimension {dimension}")
-    _create_vector_index(dimension)
+    driver = get_driver()
 
-    print(f"Writing {len(chunks)} chunk(s) to Neo4j")
-    _write_chunks(chunks)
+    # 1. Fetch existing files and hashes from the database
+    print("Fetching existing file hashes from Neo4j...")
+    try:
+        res = await driver.execute_query(
+            f"MATCH (c:{CHUNK_LABEL}) RETURN DISTINCT c.source AS source, c.file_hash AS file_hash"
+        )
+        db_files = {r["source"]: r["file_hash"] for r in res.records if r["source"]}
+    except Exception as e:
+        print(f"Notice: Failed to fetch hashes (database might be empty or index doesn't exist yet): {e}")
+        db_files = {}
 
-    print("Ingestion complete")
+    # 2. Determine changes: new, modified, or deleted files
+    local_sources = set(local_hashes.keys())
+    db_sources = set(db_files.keys())
+
+    deleted_sources = db_sources - local_sources
+    new_sources = local_sources - db_sources
+    modified_sources = {
+        source for source in (local_sources & db_sources)
+        if local_hashes[source] != db_files[source]
+    }
+
+    to_embed = new_sources | modified_sources
+    to_delete = deleted_sources | modified_sources
+
+    if not to_embed and not to_delete:
+        print("No changes detected. Database is up to date!")
+        await close_driver()
+        return
+
+    # 3. Handle deletions
+    if to_delete:
+        print(f"Deleting existing database chunks for: {', '.join(to_delete)}")
+        await driver.execute_query(
+            f"MATCH (c:{CHUNK_LABEL}) WHERE c.source IN $sources DETACH DELETE c",
+            sources=list(to_delete),
+        )
+
+    # 4. Handle insertions and modifications
+    if to_embed:
+        print(f"Embedding and writing updates for: {', '.join(to_embed)}")
+        docs_to_embed = [doc for doc in documents if doc.path.name in to_embed]
+
+        chunks: list[EmbeddedChunk] = []
+        for doc in docs_to_embed:
+            doc_chunks = chunk_text(doc.text)
+            print(f"Chunking {doc.path.name}: {len(doc_chunks)} chunk(s)")
+
+            for chunk_index, content in enumerate(doc_chunks):
+                print(f"Embedding {doc.path.name} chunk {chunk_index + 1}/{len(doc_chunks)}")
+                embedding = await embed_text(content)
+                chunks.append(
+                    EmbeddedChunk(
+                        id=_chunk_id(doc.path.name, chunk_index, content),
+                        title=doc.title,
+                        source=doc.path.name,
+                        section=doc.section,
+                        content=content,
+                        chunk_index=chunk_index,
+                        embedding=embedding,
+                    )
+                )
+
+        if chunks:
+            dimension = len(chunks[0].embedding)
+            if dimension <= 0:
+                raise SystemExit("Embedding model returned an empty vector")
+
+            # Ensure vector index exists
+            print(f"Ensuring Neo4j vector index '{INDEX_NAME}' with dimension {dimension}")
+            cypher_index = f"""
+            CREATE VECTOR INDEX {INDEX_NAME} IF NOT EXISTS
+            FOR (c:{CHUNK_LABEL})
+            ON (c.embedding)
+            OPTIONS {{
+              indexConfig: {{
+                `vector.dimensions`: $dimension,
+                `vector.similarity_function`: 'cosine'
+              }}
+            }}
+            """
+            await driver.execute_query(cypher_index, dimension=dimension)
+            await driver.execute_query("CALL db.awaitIndexes(300)")
+
+            # Write the chunks to Neo4j
+            print(f"Writing {len(chunks)} chunk(s) to Neo4j...")
+            rows = [
+                {
+                    "id": chunk.id,
+                    "title": chunk.title,
+                    "source": chunk.source,
+                    "section": chunk.section,
+                    "content": chunk.content,
+                    "chunk_index": chunk.chunk_index,
+                    "embedding": chunk.embedding,
+                    "file_hash": local_hashes[chunk.source],
+                }
+                for chunk in chunks
+            ]
+
+            cypher_write = f"""
+            UNWIND $rows AS row
+            CREATE (c:{CHUNK_LABEL})
+            SET
+              c.id = row.id,
+              c.title = row.title,
+              c.source = row.source,
+              c.section = row.section,
+              c.content = row.content,
+              c.chunk_index = row.chunk_index,
+              c.embedding = row.embedding,
+              c.file_hash = row.file_hash,
+              c.ingested_at = datetime()
+            """
+            await driver.execute_query(cypher_write, rows=rows)
+
+    print("Ingestion complete successfully.")
+    await close_driver()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

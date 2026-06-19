@@ -1,7 +1,7 @@
 import logging
 import os
 
-from litellm import completion, embedding
+from litellm import acompletion, aembedding
 
 from app.config import settings
 
@@ -13,9 +13,9 @@ def _ensure_gemini_key() -> None:
         os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
 
-def embed_text(text: str) -> list[float]:
+async def embed_text(text: str) -> list[float]:
     _ensure_gemini_key()
-    response = embedding(
+    response = await aembedding(
         model=settings.litellm_embedding_model,
         input=[text],
     )
@@ -25,10 +25,10 @@ def embed_text(text: str) -> list[float]:
     return item.embedding
 
 
-def generate_answer(messages: list[dict[str, str]]) -> str:
+async def generate_answer(messages: list[dict[str, str]]) -> str:
     _ensure_gemini_key()
     try:
-        response = completion(
+        response = await acompletion(
             model=settings.litellm_chat_model,
             messages=messages,
         )
@@ -41,7 +41,7 @@ def generate_answer(messages: list[dict[str, str]]) -> str:
             f"Primary model {settings.litellm_chat_model} failed: {e}. "
             f"Falling back to {settings.litellm_fallback_model}."
         )
-        response = completion(
+        response = await acompletion(
             model=settings.litellm_fallback_model,
             messages=messages,
         )
@@ -51,15 +51,15 @@ def generate_answer(messages: list[dict[str, str]]) -> str:
         return message.content or ""
 
 
-def generate_answer_stream(messages: list[dict[str, str]]):
+async def generate_answer_stream(messages: list[dict[str, str]]):
     _ensure_gemini_key()
     try:
-        response = completion(
+        response = await acompletion(
             model=settings.litellm_chat_model,
             messages=messages,
             stream=True,
         )
-        for chunk in response:
+        async for chunk in response:
             delta = chunk.choices[0].delta
             if isinstance(delta, dict):
                 content = delta.get("content", "")
@@ -72,12 +72,12 @@ def generate_answer_stream(messages: list[dict[str, str]]):
             f"Primary model {settings.litellm_chat_model} failed: {e}. "
             f"Falling back to stream on {settings.litellm_fallback_model}."
         )
-        response = completion(
+        response = await acompletion(
             model=settings.litellm_fallback_model,
             messages=messages,
             stream=True,
         )
-        for chunk in response:
+        async for chunk in response:
             delta = chunk.choices[0].delta
             if isinstance(delta, dict):
                 content = delta.get("content", "")
