@@ -14,6 +14,10 @@ class Settings(BaseSettings):
         default="gemini/gemini-2.5-flash",
         alias="LITELLM_CHAT_MODEL",
     )
+    litellm_fallback_model: str = Field(
+        default="gemini/gemini-3.1-flash-lite",
+        alias="LITELLM_FALLBACK_MODEL",
+    )
     neo4j_uri: str = Field(default="", alias="NEO4J_URI")
     neo4j_username: str = Field(default="neo4j", alias="NEO4J_USERNAME")
     neo4j_password: str = Field(default="", alias="NEO4J_PASSWORD")
