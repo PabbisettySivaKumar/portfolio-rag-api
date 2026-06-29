@@ -25,5 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def read_root() -> dict[str, str]:
+    return {"status": "running", "service": "Siva Portfolio RAG API"}
+
+
 app.include_router(health.router)
 app.include_router(chat.router)
