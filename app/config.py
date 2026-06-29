@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     rag_top_k: int = Field(default=5, alias="RAG_TOP_K")
     rag_min_score: float = Field(default=0.72, alias="RAG_MIN_SCORE")
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
+
+    @field_validator("keepalive_token")
+    @classmethod
+    def validate_keepalive_token(cls, v: str) -> str:
+        if v and len(v) < 32:
+            raise ValueError("KEEPALIVE_TOKEN must be at least 32 characters long for security.")
+        return v
 
     class Config:
         env_file = ".env"
