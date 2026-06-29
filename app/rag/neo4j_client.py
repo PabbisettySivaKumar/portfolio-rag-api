@@ -14,6 +14,8 @@ def get_driver():
         _driver = AsyncGraphDatabase.driver(
             settings.neo4j_uri,
             auth=(settings.neo4j_username, settings.neo4j_password),
+            connection_timeout=10,
+            max_transaction_retry_time=5,
         )
     return _driver
 
