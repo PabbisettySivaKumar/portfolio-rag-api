@@ -4,6 +4,10 @@ Source: SivaKumar_Resume.pdf and public GitHub profile.
 
 Siva Kumar Pabbisetty is based in Bangalore, India.
 
+## Availability
+Siva is currently **actively seeking** and available for new full-time roles as an **AI Engineer, GenAI Developer, or Backend Python Developer** (open to remote or on-site positions in India). He is available for immediate hire.
+
+
 Public contact links:
 - Email: pabbisettyssivakumar@gmail.com
 - Phone: +91-7702999095
