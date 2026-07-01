@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     neo4j_username: str = Field(default="neo4j", alias="NEO4J_USERNAME")
     neo4j_password: str = Field(default="", alias="NEO4J_PASSWORD")
     keepalive_token: str = Field(default="", alias="KEEPALIVE_TOKEN")
-    rag_top_k: int = Field(default=5, alias="RAG_TOP_K")
+    rag_top_k: int = Field(default=10, alias="RAG_TOP_K")
     rag_min_score: float = Field(default=0.72, alias="RAG_MIN_SCORE")
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
 
