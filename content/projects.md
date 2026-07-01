@@ -91,31 +91,6 @@ Relevant technologies:
 - Async workflows
 - Prompt engineering
 
-## TawasolPay Risk Assistant
-
-Repository: https://github.com/PabbisettySivaKumar/TAWASOLPAY-RISK-ASSISTANT
-
-The TawasolPay Risk Assistant is an AI-powered cyber risk prioritization project for a fictional payments company. It ingests daily security data, scores vulnerabilities across multiple signals, retrieves grounded NIST 800-53 guidance through RAG, and presents top risks in a Streamlit UI.
-
-Public demo links from the repository:
-- Frontend: https://itspsk-tawasolpay-frontend.hf.space
-- Backend: https://itspsk-tawasolpay-backend.hf.space
-- Backend docs: https://itspsk-tawasolpay-backend.hf.space/docs
-
-Capabilities:
-- Ranks security risks.
-- Retrieves NIST guidance through RAG.
-- Uses a FastAPI backend.
-- Provides a Streamlit frontend.
-- Generates LLM explanations for risk findings.
-
-Relevant technologies:
-- Python
-- FastAPI
-- Streamlit
-- RAG
-- Cyber risk analysis
-- Docker
 
 ## Leave Management System
 
@@ -151,18 +126,6 @@ Relevant technologies:
 - CSS Modules
 - Responsive web design
 
-## Business Analysis Website
-
-Repository: https://github.com/PabbisettySivaKumar/business_analysis
-
-Live app: https://business-analysis-murex.vercel.app
-
-This is a public web project in Siva's GitHub profile. GitHub reports HTML, JavaScript, and CSS as the primary technologies.
-
-Relevant technologies:
-- HTML
-- JavaScript
-- CSS
 
 ## Portfolio Hosting
 
