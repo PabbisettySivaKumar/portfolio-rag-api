@@ -13,11 +13,12 @@ def _ensure_gemini_key() -> None:
         os.environ["GEMINI_API_KEY"] = settings.gemini_api_key
 
 
-async def embed_text(text: str) -> list[float]:
+async def embed_text(text: str, metadata: dict | None = None) -> list[float]:
     _ensure_gemini_key()
     response = await aembedding(
         model=settings.litellm_embedding_model,
         input=[text],
+        metadata=metadata,
     )
     item = response.data[0]
     if isinstance(item, dict):
@@ -25,12 +26,15 @@ async def embed_text(text: str) -> list[float]:
     return item.embedding
 
 
-async def generate_answer(messages: list[dict[str, str]]) -> str:
+async def generate_answer(
+    messages: list[dict[str, str]], metadata: dict | None = None
+) -> str:
     _ensure_gemini_key()
     try:
         response = await acompletion(
             model=settings.litellm_chat_model,
             messages=messages,
+            metadata=metadata,
         )
         message = response.choices[0].message
         if isinstance(message, dict):
@@ -44,6 +48,7 @@ async def generate_answer(messages: list[dict[str, str]]) -> str:
         response = await acompletion(
             model=settings.litellm_fallback_model,
             messages=messages,
+            metadata=metadata,
         )
         message = response.choices[0].message
         if isinstance(message, dict):
@@ -51,13 +56,16 @@ async def generate_answer(messages: list[dict[str, str]]) -> str:
         return message.content or ""
 
 
-async def generate_answer_stream(messages: list[dict[str, str]]):
+async def generate_answer_stream(
+    messages: list[dict[str, str]], metadata: dict | None = None
+):
     _ensure_gemini_key()
     try:
         response = await acompletion(
             model=settings.litellm_chat_model,
             messages=messages,
             stream=True,
+            metadata=metadata,
         )
         async for chunk in response:
             delta = chunk.choices[0].delta
@@ -76,6 +84,7 @@ async def generate_answer_stream(messages: list[dict[str, str]]):
             model=settings.litellm_fallback_model,
             messages=messages,
             stream=True,
+            metadata=metadata,
         )
         async for chunk in response:
             delta = chunk.choices[0].delta

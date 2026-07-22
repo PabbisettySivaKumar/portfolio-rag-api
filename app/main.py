@@ -4,14 +4,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.rag.neo4j_client import close_driver
-from app.routes import chat, health
+from app.rag.observability import flush_langfuse, init_langfuse
+from app.routes import chat, feedback, health
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    init_langfuse()
     yield
     # Shutdown
+    flush_langfuse()
     await close_driver()
 
 
@@ -32,3 +35,4 @@ def read_root() -> dict[str, str]:
 
 app.include_router(health.router)
 app.include_router(chat.router)
+app.include_router(feedback.router)

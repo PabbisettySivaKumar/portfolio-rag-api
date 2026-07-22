@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -22,6 +22,13 @@ class Settings(BaseSettings):
     neo4j_username: str = Field(default="neo4j", alias="NEO4J_USERNAME")
     neo4j_password: str = Field(default="", alias="NEO4J_PASSWORD")
     keepalive_token: str = Field(default="", alias="KEEPALIVE_TOKEN")
+    langfuse_enabled: bool = Field(default=False, alias="LANGFUSE_ENABLED")
+    langfuse_public_key: str = Field(default="", alias="LANGFUSE_PUBLIC_KEY")
+    langfuse_secret_key: str = Field(default="", alias="LANGFUSE_SECRET_KEY")
+    langfuse_host: str = Field(
+        default="https://cloud.langfuse.com",
+        validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
+    )
     rag_top_k: int = Field(default=10, alias="RAG_TOP_K")
     rag_min_score: float = Field(default=0.72, alias="RAG_MIN_SCORE")
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
@@ -36,6 +43,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         populate_by_name = True
+        extra = "ignore"
 
 
 @lru_cache
