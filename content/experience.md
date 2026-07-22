@@ -4,7 +4,7 @@ Source: SivaKumar_Resume.pdf.
 
 ## AI Engineer Intern - Dotkonnekt
 
-Period: November 2025 - Present
+Period: November 2025 - March 2026
 
 Siva works on production-grade AI systems involving multimodal generation, LLM integrations, data pipelines, backend APIs, and AI-powered analysis.
 
