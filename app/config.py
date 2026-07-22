@@ -11,11 +11,11 @@ class Settings(BaseSettings):
         alias="LITELLM_EMBEDDING_MODEL",
     )
     litellm_chat_model: str = Field(
-        default="gemini/gemini-2.5-flash",
+        default="gemini/gemini-3.1-flash-lite",
         alias="LITELLM_CHAT_MODEL",
     )
     litellm_fallback_model: str = Field(
-        default="gemini/gemini-3.1-flash-lite",
+        default="gemini/gemini-2.5-flash",
         alias="LITELLM_FALLBACK_MODEL",
     )
     neo4j_uri: str = Field(default="", alias="NEO4J_URI")
