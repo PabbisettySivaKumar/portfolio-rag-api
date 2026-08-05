@@ -112,6 +112,15 @@ def init_langfuse() -> None:
         _langfuse_client = None
 
 
+def get_client():
+    """Return the initialized Langfuse SDK client, or None when disabled.
+
+    Exposed for offline tooling (e.g. the dataset eval runner) that needs the
+    raw client for datasets/scores rather than the request-path trace helpers.
+    """
+    return _langfuse_client
+
+
 def flush_langfuse() -> None:
     """Flush any buffered events. Call on shutdown so nothing is lost."""
     if _langfuse_client is None:
