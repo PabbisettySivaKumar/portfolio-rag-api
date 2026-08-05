@@ -2,13 +2,14 @@ import json
 import logging
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
 from app.models import ChatMessage, ChatRequest, Source
 from app.rag import observability as obs
 from app.rag.cache import query_cache
+from app.rate_limit import InMemoryRateLimiter, client_ip_from_request
 from app.rag.guardrails import OUT_OF_SCOPE_RESPONSE, is_portfolio_question
 from app.rag.llm import embed_text, generate_answer, generate_answer_stream
 from app.rag.retrieval import RetrievedChunk, search_chunks
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 # Only the most recent turns are used for condensing and answering, so token
 # cost and latency stay bounded no matter how long the conversation grows.
 MAX_HISTORY_MESSAGES = 8
+
+# Per-IP cap on /chat. CORS can't restrict callers on HF Spaces (the platform
+# proxy injects permissive CORS), so this is the real guard against a single
+# source running up the Gemini bill. Keyed on the forwarded client IP.
+chat_limiter = InMemoryRateLimiter(requests_limit=20, window_seconds=60)
 
 NO_CONTEXT_RESPONSE = (
     "I don't have enough information in Siva's portfolio knowledge base to answer that."
@@ -122,7 +128,14 @@ def _sources_from_chunks(chunks: list[RetrievedChunk]) -> list[Source]:
 
 
 @router.post("/chat")
-async def chat(request: ChatRequest) -> StreamingResponse:
+async def chat(request: ChatRequest, http_request: Request) -> StreamingResponse:
+    # Rate limit per client IP before any embedding/LLM work is done.
+    if chat_limiter.is_rate_limited(client_ip_from_request(http_request)):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please slow down and try again shortly.",
+        )
+
     question = request.message.strip()
     history = request.history[-MAX_HISTORY_MESSAGES:]
     session_id = request.session_id

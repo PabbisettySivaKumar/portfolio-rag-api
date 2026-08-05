@@ -1,30 +1,12 @@
 import hmac
-import time
-from collections import defaultdict
 
 from fastapi import APIRouter, Header, HTTPException, Request, status
 
 from app.config import settings
 from app.rag.neo4j_client import get_driver
+from app.rate_limit import InMemoryRateLimiter, client_ip_from_request
 
 router = APIRouter(tags=["health"])
-
-
-class InMemoryRateLimiter:
-    def __init__(self, requests_limit: int = 5, window_seconds: int = 60):
-        self.requests_limit = requests_limit
-        self.window_seconds = window_seconds
-        self.history = defaultdict(list)
-
-    def is_rate_limited(self, key: str) -> bool:
-        now = time.time()
-        # Clean up history for this key to prevent memory leaks
-        self.history[key] = [t for t in self.history[key] if now - t < self.window_seconds]
-        if len(self.history[key]) >= self.requests_limit:
-            return True
-        self.history[key].append(now)
-        return False
-
 
 # Limit to 5 keepalive requests per minute per IP
 keepalive_limiter = InMemoryRateLimiter(requests_limit=5, window_seconds=60)
@@ -47,7 +29,7 @@ async def neo4j_keepalive(
         )
 
     # Rate limit by client IP
-    client_ip = request.client.host if (request.client and request.client.host) else "unknown"
+    client_ip = client_ip_from_request(request)
     if keepalive_limiter.is_rate_limited(client_ip):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
