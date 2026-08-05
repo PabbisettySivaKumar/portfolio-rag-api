@@ -16,6 +16,11 @@ def get_driver():
             auth=(settings.neo4j_username, settings.neo4j_password),
             connection_timeout=10,
             max_transaction_retry_time=5,
+            # Aura reaps idle connections server-side; validate an idle connection
+            # before reusing it and recycle connections well before that window so
+            # a stale one is never handed to a query ("defunct connection" errors).
+            liveness_check_timeout=30,
+            max_connection_lifetime=300,
         )
     return _driver
 
