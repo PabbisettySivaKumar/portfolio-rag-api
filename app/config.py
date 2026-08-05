@@ -30,7 +30,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("LANGFUSE_HOST", "LANGFUSE_BASE_URL"),
     )
     rag_top_k: int = Field(default=10, alias="RAG_TOP_K")
-    rag_min_score: float = Field(default=0.72, alias="RAG_MIN_SCORE")
+    # Tuned via evals/run_eval.py --sweep: 0.80 trims low-relevance chunks with
+    # no recall/precision loss on the eval set (100% recall holds up to ~0.83).
+    rag_min_score: float = Field(default=0.80, alias="RAG_MIN_SCORE")
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
 
     @field_validator("keepalive_token")
