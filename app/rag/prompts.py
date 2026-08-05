@@ -11,3 +11,23 @@ Always format your response using clean, structured Markdown (including bolding,
 """
 
 CONDENSE_SYSTEM_PROMPT = """Given a chat history and the latest user question which might reference context in the chat history, formulate a standalone question which can be understood without the chat history. Do NOT answer the question, just reformulate it if needed and otherwise return it as is."""
+
+SCOPE_CLASSIFIER_PROMPT = """You decide whether a question can be answered by Siva Kumar's professional portfolio assistant.
+
+In scope: anything about Siva Kumar himself — his experience, projects, skills, tech stack, education, certifications, contact details, availability for work — and meta questions a visitor would reasonably ask the assistant (e.g. "who are you", "what can you do", greetings).
+
+Out of scope: general knowledge, coding help, math, current events, jokes, questions about other people, or anything unrelated to Siva.
+
+Reply with exactly one word: YES if in scope, NO if out of scope. Output only YES or NO."""
+
+
+# Registry of prompts managed in Langfuse Prompt Management. The keys are the
+# Langfuse prompt names; the values are the bundled defaults used both to seed
+# Langfuse (see scripts/seed_langfuse_prompts.py) and as the offline fallback
+# when Langfuse is disabled or unreachable. Edit a prompt in the Langfuse UI to
+# override the default at runtime without redeploying.
+LANGFUSE_PROMPTS: dict[str, str] = {
+    "portfolio-answer-system": ANSWER_SYSTEM_PROMPT,
+    "portfolio-condense-system": CONDENSE_SYSTEM_PROMPT,
+    "portfolio-scope-classifier": SCOPE_CLASSIFIER_PROMPT,
+}

@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
@@ -10,11 +11,14 @@ from app.rag import observability as obs
 from app.rag.cache import query_cache
 from app.rag.guardrails import OUT_OF_SCOPE_RESPONSE, is_portfolio_question
 from app.rag.llm import embed_text, generate_answer, generate_answer_stream
-from app.rag.prompts import ANSWER_SYSTEM_PROMPT, CONDENSE_SYSTEM_PROMPT
 from app.rag.retrieval import RetrievedChunk, search_chunks
 
 router = APIRouter(tags=["chat"])
 logger = logging.getLogger(__name__)
+
+# Only the most recent turns are used for condensing and answering, so token
+# cost and latency stay bounded no matter how long the conversation grows.
+MAX_HISTORY_MESSAGES = 8
 
 NO_CONTEXT_RESPONSE = (
     "I don't have enough information in Siva's portfolio knowledge base to answer that."
@@ -22,6 +26,14 @@ NO_CONTEXT_RESPONSE = (
 ERROR_RESPONSE = (
     "Something went wrong while searching Siva's portfolio. Please try again."
 )
+
+
+def _cache_key(condensed_question: str) -> str:
+    """Normalize a question into a cache key so trivial phrasing differences
+    ("Skills?", " skills ") collapse to the same entry. Keying on the condensed
+    standalone question (not raw question + full history) is what lets multi-turn
+    conversations reuse cached answers."""
+    return re.sub(r"\s+", " ", condensed_question.strip().lower()).strip(" ?.!")
 
 
 async def _condense_question(
@@ -42,7 +54,7 @@ Latest Question: {question}
 Formulate a standalone question that captures the user's intent without referring to the conversation history. If the question is already a standalone question, return it exactly as is. Do NOT answer the question."""
 
     messages = [
-        {"role": "system", "content": CONDENSE_SYSTEM_PROMPT},
+        {"role": "system", "content": obs.get_prompt("portfolio-condense-system")},
         {"role": "user", "content": prompt},
     ]
 
@@ -80,7 +92,7 @@ def _build_messages(
 ) -> list[dict[str, str]]:
     context = _build_context(chunks)
     
-    messages = [{"role": "system", "content": ANSWER_SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": obs.get_prompt("portfolio-answer-system")}]
     
     # Append history
     for msg in history:
@@ -112,7 +124,7 @@ def _sources_from_chunks(chunks: list[RetrievedChunk]) -> list[Source]:
 @router.post("/chat")
 async def chat(request: ChatRequest) -> StreamingResponse:
     question = request.message.strip()
-    history = request.history
+    history = request.history[-MAX_HISTORY_MESSAGES:]
     session_id = request.session_id
 
     async def event_generator():
@@ -122,20 +134,9 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             # Surface the trace id so the client can attach /feedback to it.
             yield json.dumps({"type": "trace", "trace_id": trace.id}) + "\n"
 
-        # Check cache
-        cache_key = f"{question}|||{json.dumps([h.dict() if hasattr(h, 'dict') else h.model_dump() for h in history])}"
-        cached = query_cache.get(cache_key)
-        cache_span = obs.start_span(trace, "cache_lookup", span_input=question)
-        if cached is not None:
-            logger.info("Cache hit for query")
-            obs.end_span(cache_span, output={"hit": True})
-            obs.update_trace(trace, output=cached["answer"], metadata={"cache_hit": True})
-            yield json.dumps({"type": "sources", "sources": cached["sources"]}) + "\n"
-            yield json.dumps({"type": "token", "content": cached["answer"]}) + "\n"
-            return
-        obs.end_span(cache_span, output={"hit": False})
-
-        # 1. Condense the question based on context history
+        # 1. Condense the question based on context history. Done before the
+        # cache lookup so the cache is keyed on the standalone intent, which lets
+        # multi-turn conversations reuse answers. (No history -> no LLM call.)
         condense_span = obs.start_span(
             trace,
             "condense_question",
@@ -150,9 +151,24 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             condensed_question = question
         obs.end_span(condense_span, output=condensed_question)
 
-        # 2. Run guardrails on the condensed standalone question
+        # 2. Check cache using the normalized standalone question.
+        cache_key = _cache_key(condensed_question)
+        cached = query_cache.get(cache_key)
+        cache_span = obs.start_span(trace, "cache_lookup", span_input=cache_key)
+        if cached is not None:
+            logger.info("Cache hit for query")
+            obs.end_span(cache_span, output={"hit": True})
+            obs.update_trace(trace, output=cached["answer"], metadata={"cache_hit": True})
+            yield json.dumps({"type": "sources", "sources": cached["sources"]}) + "\n"
+            yield json.dumps({"type": "token", "content": cached["answer"]}) + "\n"
+            return
+        obs.end_span(cache_span, output={"hit": False})
+
+        # 3. Run guardrails on the condensed standalone question
         guardrail_span = obs.start_span(trace, "guardrail", span_input=condensed_question)
-        if not is_portfolio_question(condensed_question):
+        if not await is_portfolio_question(
+            condensed_question, obs.llm_metadata(trace, "scope-classify", session_id)
+        ):
             obs.end_span(guardrail_span, output={"in_scope": False})
             obs.update_trace(trace, output=OUT_OF_SCOPE_RESPONSE, metadata={"out_of_scope": True})
             yield json.dumps({"type": "token", "content": OUT_OF_SCOPE_RESPONSE}) + "\n"
@@ -161,7 +177,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
         obs.end_span(guardrail_span, output={"in_scope": True})
 
         try:
-            # 3. Search database using the condensed question
+            # 4. Search database using the condensed question
             embed_span = obs.start_span(trace, "embed", span_input=condensed_question)
             query_embedding = await embed_text(
                 condensed_question, obs.llm_metadata(trace, "embed-question", session_id)
@@ -196,7 +212,7 @@ async def chat(request: ChatRequest) -> StreamingResponse:
             sources_list = [{"title": s.title, "snippet": s.snippet} for s in sources_payload]
             yield json.dumps({"type": "sources", "sources": sources_list}) + "\n"
 
-            # 4. Generate answer using raw question + context + history
+            # 5. Generate answer using raw question + context + history
             gen_span = obs.start_span(
                 trace, "generate", span_input={"num_chunks": len(chunks)}
             )

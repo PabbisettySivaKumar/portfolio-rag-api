@@ -5,11 +5,13 @@ from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
     role: Literal["user", "assistant"]
-    content: str
+    content: str = Field(max_length=4000)
 
 
 class ChatRequest(BaseModel):
-    message: str = Field(min_length=1)
+    # Cap the question length so a single request can't drive unbounded
+    # embedding/LLM cost; 2000 chars is far more than any real portfolio question.
+    message: str = Field(min_length=1, max_length=2000)
     history: list[ChatMessage] = Field(default_factory=list)
     session_id: str | None = Field(default=None)
 

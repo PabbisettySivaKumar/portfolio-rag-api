@@ -20,10 +20,15 @@ import re
 from typing import Any
 
 from app.config import settings
+from app.rag.prompts import LANGFUSE_PROMPTS
 
 logger = logging.getLogger(__name__)
 
 _langfuse_client = None
+
+# How long a fetched prompt is reused before Langfuse is checked again. Edits in
+# the Langfuse UI take at most this long to propagate to a running server.
+_PROMPT_CACHE_TTL_SECONDS = 300
 
 # PII redaction applied to everything shipped to Langfuse.
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
@@ -115,6 +120,62 @@ def flush_langfuse() -> None:
         _langfuse_client.flush()
     except Exception:
         logger.exception("Failed to flush Langfuse")
+
+
+def get_prompt(name: str, cache_ttl_seconds: int = _PROMPT_CACHE_TTL_SECONDS) -> str:
+    """Return the text of a Langfuse-managed prompt, falling back to the bundled
+    default in ``LANGFUSE_PROMPTS``.
+
+    Returns the local default verbatim when Langfuse is disabled, when the prompt
+    has not been seeded yet, or when the fetch fails, so behaviour is identical
+    without observability configured. Results are cached by the Langfuse SDK for
+    ``cache_ttl_seconds`` to avoid a network call on every request.
+    """
+    fallback = LANGFUSE_PROMPTS[name]
+    if _langfuse_client is None:
+        return fallback
+    try:
+        prompt = _langfuse_client.get_prompt(
+            name,
+            fallback=fallback,
+            label="production",
+            cache_ttl_seconds=cache_ttl_seconds,
+        )
+        return prompt.prompt
+    except Exception:
+        logger.exception("Langfuse get_prompt failed for %s; using bundled default", name)
+        return fallback
+
+
+def seed_prompts(*, force: bool = False) -> dict:
+    """Create the managed prompts in Langfuse from the bundled defaults.
+
+    Idempotent: existing prompts are skipped unless ``force`` creates a new
+    version. Intended to be run once from scripts/seed_langfuse_prompts.py, not
+    on every startup (each create call would otherwise add a version).
+    """
+    if _langfuse_client is None:
+        raise RuntimeError("Langfuse is not enabled/configured; cannot seed prompts")
+
+    created, skipped = [], []
+    for name, text in LANGFUSE_PROMPTS.items():
+        if not force:
+            try:
+                # get_prompt without a fallback raises when the prompt is absent.
+                _langfuse_client.get_prompt(name, cache_ttl_seconds=0)
+                skipped.append(name)
+                continue
+            except Exception:
+                pass
+        _langfuse_client.create_prompt(
+            name=name,
+            prompt=text,
+            labels=["production"],
+            type="text",
+        )
+        created.append(name)
+    _langfuse_client.flush()
+    return {"created": created, "skipped": skipped}
 
 
 def start_trace(name: str, user_input: str, session_id: str | None = None):

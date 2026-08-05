@@ -4,6 +4,12 @@ Thin wrapper around app.rag.ingest.ingest_content(). Run manually with:
 
     ./venv/bin/python scripts/ingest.py
 
+Incremental by default (only changed files are re-embedded). Pass --force to
+re-chunk and re-embed every file regardless of its hash, e.g. after changing the
+chunking logic or embedding model:
+
+    ./venv/bin/python scripts/ingest.py --force
+
 The core logic lives in app/rag/ingest.py so it can also be invoked from the
 running application (see app/main.py lifespan).
 """
@@ -23,8 +29,9 @@ from app.rag.neo4j_client import close_driver  # noqa: E402
 
 
 async def main() -> None:
+    force = "--force" in sys.argv[1:]
     try:
-        summary = await ingest_content()
+        summary = await ingest_content(force=force)
     except MissingIngestEnv as e:
         raise SystemExit(str(e))
     finally:

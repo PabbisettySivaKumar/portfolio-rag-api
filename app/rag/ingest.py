@@ -92,10 +92,18 @@ def _chunk_id(source: str, chunk_index: int, content: str) -> str:
     return digest[:24]
 
 
-async def ingest_content(*, log: logging.Logger | None = None) -> dict:
-    """Sync content/*.md into Neo4j. Incremental: only new/modified files are
-    re-embedded, deleted files are removed. Uses the shared app driver and never
-    closes it, so it is safe to call from within the running application.
+async def ingest_content(
+    *, force: bool = False, log: logging.Logger | None = None
+) -> dict:
+    """Sync content/*.md into Neo4j. Incremental by default: only new/modified
+    files are re-embedded and deleted files are removed. Uses the shared app
+    driver and never closes it, so it is safe to call from within the running
+    application.
+
+    With ``force=True`` every file is re-chunked and re-embedded regardless of
+    its hash (existing chunks are dropped first). Use this after changing the
+    chunking logic or embedding model, when file hashes are unchanged but the
+    stored vectors are stale.
 
     Returns a summary dict. Raises MissingIngestEnv on missing config.
     """
@@ -125,16 +133,23 @@ async def ingest_content(*, log: logging.Logger | None = None) -> dict:
     local_sources = set(local_hashes.keys())
     db_sources = set(db_files.keys())
 
-    deleted_sources = db_sources - local_sources
-    new_sources = local_sources - db_sources
-    modified_sources = {
-        source
-        for source in (local_sources & db_sources)
-        if local_hashes[source] != db_files[source]
-    }
+    if force:
+        # Re-embed every local file and drop everything currently stored
+        # (including chunks for any file removed since the last run).
+        out.info("Ingestion: force=True; re-embedding all content.")
+        to_embed = set(local_sources)
+        to_delete = set(db_sources)
+    else:
+        deleted_sources = db_sources - local_sources
+        new_sources = local_sources - db_sources
+        modified_sources = {
+            source
+            for source in (local_sources & db_sources)
+            if local_hashes[source] != db_files[source]
+        }
 
-    to_embed = new_sources | modified_sources
-    to_delete = deleted_sources | modified_sources
+        to_embed = new_sources | modified_sources
+        to_delete = deleted_sources | modified_sources
 
     if not to_embed and not to_delete:
         out.info("Ingestion: no content changes detected; database is up to date.")

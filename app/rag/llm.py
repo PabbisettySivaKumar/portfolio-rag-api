@@ -56,41 +56,51 @@ async def generate_answer(
         return message.content or ""
 
 
+async def _stream_completion(
+    model: str, messages: list[dict[str, str]], metadata: dict | None
+):
+    response = await acompletion(
+        model=model,
+        messages=messages,
+        stream=True,
+        metadata=metadata,
+    )
+    async for chunk in response:
+        delta = chunk.choices[0].delta
+        if isinstance(delta, dict):
+            content = delta.get("content", "")
+        else:
+            content = getattr(delta, "content", "") or ""
+        if content:
+            yield content
+
+
 async def generate_answer_stream(
     messages: list[dict[str, str]], metadata: dict | None = None
 ):
     _ensure_gemini_key()
+    started = False
     try:
-        response = await acompletion(
-            model=settings.litellm_chat_model,
-            messages=messages,
-            stream=True,
-            metadata=metadata,
-        )
-        async for chunk in response:
-            delta = chunk.choices[0].delta
-            if isinstance(delta, dict):
-                content = delta.get("content", "")
-            else:
-                content = getattr(delta, "content", "") or ""
-            if content:
-                yield content
+        async for content in _stream_completion(
+            settings.litellm_chat_model, messages, metadata
+        ):
+            started = True
+            yield content
     except Exception as e:
+        # If tokens were already streamed to the client, falling back would
+        # replay the full answer on top of the partial one. Re-raise instead so
+        # the caller surfaces a single error rather than duplicated output.
+        if started:
+            logger.exception(
+                f"Primary model {settings.litellm_chat_model} failed mid-stream; "
+                "not falling back to avoid duplicate output."
+            )
+            raise
         logger.warning(
-            f"Primary model {settings.litellm_chat_model} failed: {e}. "
+            f"Primary model {settings.litellm_chat_model} failed before streaming: {e}. "
             f"Falling back to stream on {settings.litellm_fallback_model}."
         )
-        response = await acompletion(
-            model=settings.litellm_fallback_model,
-            messages=messages,
-            stream=True,
-            metadata=metadata,
-        )
-        async for chunk in response:
-            delta = chunk.choices[0].delta
-            if isinstance(delta, dict):
-                content = delta.get("content", "")
-            else:
-                content = getattr(delta, "content", "") or ""
-            if content:
-                yield content
+        async for content in _stream_completion(
+            settings.litellm_fallback_model, messages, metadata
+        ):
+            yield content

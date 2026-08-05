@@ -9,7 +9,7 @@ from app.config import settings
 from app.rag.ingest import ingest_content
 from app.rag.neo4j_client import close_driver
 from app.rag.observability import flush_langfuse, init_langfuse
-from app.routes import chat, feedback, health
+from app.routes import admin, chat, feedback, health
 
 logger = logging.getLogger(__name__)
 
@@ -57,3 +57,4 @@ def read_root() -> dict[str, str]:
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(feedback.router)
+app.include_router(admin.router)

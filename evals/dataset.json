@@ -1,0 +1,159 @@
+{
+  "description": "Evaluation set for the portfolio RAG pipeline. Each case exercises the real guardrail + retrieval (+ optional answer) path. expected_sources are the content/*.md files that SHOULD be retrieved; an empty list means a meta/greeting question where only the guardrail is checked. expected_keywords are facts the answer should mention (checked only with --answer, lenient: any match passes).",
+  "cases": [
+    {
+      "id": "projects-overview",
+      "question": "What projects has Siva built?",
+      "scope": "in",
+      "expected_sources": ["projects.md"],
+      "expected_keywords": ["RAG", "Reddit", "Analysis"]
+    },
+    {
+      "id": "project-agentic-rag",
+      "question": "Tell me about the Agentic RAG System project.",
+      "scope": "in",
+      "expected_sources": ["projects.md"],
+      "expected_keywords": ["Neo4j", "Ollama", "PDF"]
+    },
+    {
+      "id": "project-intelligent-analysis",
+      "question": "What does the Intelligent Analysis System do?",
+      "scope": "in",
+      "expected_sources": ["projects.md"],
+      "expected_keywords": ["CSV", "Streamlit", "Pandas"]
+    },
+    {
+      "id": "project-leave-management",
+      "question": "What is the Leave Management System project?",
+      "scope": "in",
+      "expected_sources": ["projects.md"],
+      "expected_keywords": ["leave", "FastAPI", "Next.js"]
+    },
+    {
+      "id": "experience-companies",
+      "question": "Which companies has Siva worked at?",
+      "scope": "in",
+      "expected_sources": ["experience.md"],
+      "expected_keywords": ["Dotkonnekt", "Mast Global"]
+    },
+    {
+      "id": "experience-dotkonnekt",
+      "question": "What did Siva do at Dotkonnekt?",
+      "scope": "in",
+      "expected_sources": ["experience.md"],
+      "expected_keywords": ["multimodal", "Reddit", "LLM"]
+    },
+    {
+      "id": "experience-testing",
+      "question": "Does Siva have any test automation experience?",
+      "scope": "in",
+      "expected_sources": ["experience.md"],
+      "expected_keywords": ["Selenium", "automation", "Victoria"]
+    },
+    {
+      "id": "skills-overview",
+      "question": "What are Siva's technical skills?",
+      "scope": "in",
+      "expected_sources": ["skills.md"],
+      "expected_keywords": ["LangChain", "FastAPI", "Neo4j"]
+    },
+    {
+      "id": "skills-fastapi",
+      "question": "Does Siva know FastAPI?",
+      "scope": "in",
+      "expected_sources": ["skills.md"],
+      "expected_keywords": ["FastAPI"]
+    },
+    {
+      "id": "skills-databases",
+      "question": "What databases has Siva worked with?",
+      "scope": "in",
+      "expected_sources": ["skills.md"],
+      "expected_keywords": ["Neo4j", "MongoDB", "MySQL"]
+    },
+    {
+      "id": "education-degrees",
+      "question": "What is Siva's educational background?",
+      "scope": "in",
+      "expected_sources": ["education.md"],
+      "expected_keywords": ["M.Tech", "Manipal", "B.Tech"]
+    },
+    {
+      "id": "education-certifications",
+      "question": "What certifications does Siva have?",
+      "scope": "in",
+      "expected_sources": ["education.md"],
+      "expected_keywords": ["Coursera", "Data Science"]
+    },
+    {
+      "id": "contact-how",
+      "question": "How can I get in touch with Siva?",
+      "scope": "in",
+      "expected_sources": ["contact.md"],
+      "expected_keywords": ["email", "LinkedIn", "GitHub"]
+    },
+    {
+      "id": "contact-availability",
+      "question": "Is Siva available for hire?",
+      "scope": "in",
+      "expected_sources": ["contact.md"],
+      "expected_keywords": ["available", "AI Engineer", "full-time"]
+    },
+    {
+      "id": "profile-summary",
+      "question": "Give me a summary of Siva's background.",
+      "scope": "in",
+      "expected_sources": ["profile.md"],
+      "expected_keywords": ["AI Engineer", "Bangalore", "RAG"]
+    },
+    {
+      "id": "meta-who-are-you",
+      "question": "Who are you?",
+      "scope": "in",
+      "expected_sources": [],
+      "expected_keywords": ["Siva", "portfolio"]
+    },
+    {
+      "id": "meta-what-can-you-do",
+      "question": "What can you help me with?",
+      "scope": "in",
+      "expected_sources": [],
+      "expected_keywords": ["Siva"]
+    },
+    {
+      "id": "oos-geography",
+      "question": "What is the capital of France?",
+      "scope": "out",
+      "expected_sources": [],
+      "expected_keywords": []
+    },
+    {
+      "id": "oos-poem",
+      "question": "Write me a poem about the ocean.",
+      "scope": "out",
+      "expected_sources": [],
+      "expected_keywords": []
+    },
+    {
+      "id": "oos-coding-help",
+      "question": "How do I center a div in CSS?",
+      "scope": "out",
+      "expected_sources": [],
+      "expected_keywords": []
+    },
+    {
+      "id": "oos-current-events",
+      "question": "Who won the football match yesterday?",
+      "scope": "out",
+      "expected_sources": [],
+      "expected_keywords": []
+    },
+    {
+      "id": "oos-math",
+      "question": "What is 47 multiplied by 89?",
+      "scope": "out",
+      "expected_sources": [],
+      "expected_keywords": []
+    }
+  ]
+}
