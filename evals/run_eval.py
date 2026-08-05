@@ -16,6 +16,7 @@ Requires the same env as the app (GEMINI_API_KEY, NEO4J_*). Run with:
 
     ./venv/bin/python evals/run_eval.py            # guardrail + retrieval
     ./venv/bin/python evals/run_eval.py --answer   # also score generated answers
+    ./venv/bin/python evals/run_eval.py --sweep    # tune RAG_MIN_SCORE from data
 """
 
 from __future__ import annotations
@@ -102,7 +103,78 @@ async def _eval_case(case: dict, *, check_answer: bool) -> dict:
     return result
 
 
+async def sweep() -> None:
+    """Sweep RAG_MIN_SCORE over a range and report recall / precision@1 at each,
+    so the threshold is chosen from data instead of guessed. Retrieves each case
+    once unfiltered, then applies candidate thresholds offline."""
+    from app.config import settings
+
+    thresholds = [round(0.50 + 0.05 * i, 2) for i in range(8)]  # 0.50 .. 0.85
+    data = json.loads(DATASET.read_text(encoding="utf-8"))
+    cases = [c for c in data["cases"]
+             if c["scope"] == "in" and c.get("expected_sources")]
+
+    print(f"Sweeping RAG_MIN_SCORE over {thresholds}\n"
+          f"on {len(cases)} retrieval cases (top_k={settings.rag_top_k}, "
+          f"current min_score={settings.rag_min_score})...\n")
+
+    # Collect candidate (source, score) per case once, unfiltered by min_score.
+    original = settings.rag_min_score
+    settings.rag_min_score = 0.0
+    per_case: list[tuple[list[str], list[tuple[str, float]]]] = []
+    try:
+        for case in cases:
+            embedding = await embed_text(case["question"])
+            chunks = await search_chunks(embedding)
+            per_case.append(
+                (case["expected_sources"], [(c.source, c.score) for c in chunks])
+            )
+    finally:
+        settings.rag_min_score = original
+        await close_driver()
+
+    header = f"{'min_score':11}{'recall':9}{'p@1':9}{'avg_chunks':12}{'empty_cases':12}"
+    print(header + "\n" + "-" * len(header))
+    n = len(per_case)
+    for t in thresholds:
+        recalls = p1s = empties = 0
+        counts = 0
+        for expected, cand in per_case:
+            passed = [src for src, score in cand if score >= t]
+            counts += len(passed)
+            empties += 0 if passed else 1
+            recalls += all(e in passed for e in expected)
+            p1s += bool(passed) and passed[0] in expected
+        marker = f"  {YELLOW}<- current{RESET}" if abs(t - original) < 1e-9 else ""
+        print(f"{t:<11.2f}{recalls / n:>7.0%}  {p1s / n:>7.0%}  "
+              f"{counts / n:>10.1f}  {empties:>10}{marker}")
+
+    # Highest threshold that still keeps every expected source (per source, the
+    # best-scoring chunk of that source is what must survive the cut).
+    per_source_best = []
+    for expected, cand in per_case:
+        for e in expected:
+            scores = [score for src, score in cand if src == e]
+            per_source_best.append(max(scores) if scores else 0.0)
+    safe_t = min(per_source_best) if per_source_best else 0.0
+
+    print("\n=== Recommendation ===")
+    print(f"Max min_score keeping 100% recall: {safe_t:.3f}")
+    if original <= safe_t:
+        print(f"{GREEN}Current {original} is SAFE{RESET} "
+              f"(headroom {safe_t - original:.3f} before a relevant chunk is dropped).")
+    else:
+        print(f"{RED}Current {original} is TOO HIGH{RESET} — it drops relevant "
+              f"chunks; lower it to <= {safe_t:.3f}.")
+    print("Prefer the highest min_score that holds recall at 100% with few empty "
+          "cases: that maximizes precision without missing answers.")
+
+
 async def main() -> None:
+    if "--sweep" in sys.argv[1:]:
+        await sweep()
+        return
+
     check_answer = "--answer" in sys.argv[1:]
 
     data = json.loads(DATASET.read_text(encoding="utf-8"))
