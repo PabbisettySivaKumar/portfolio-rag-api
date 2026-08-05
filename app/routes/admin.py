@@ -30,6 +30,22 @@ def _require_admin(authorization: str) -> None:
         )
 
 
+@router.get("/config")
+async def effective_config(authorization: str = Header(default="")) -> dict:
+    """Report the non-sensitive effective config the container actually loaded,
+    for diagnostics (e.g. confirming FRONTEND_ORIGIN / CORS). Token-guarded; no
+    secrets are returned."""
+    _require_admin(authorization)
+    return {
+        "frontend_origin_raw": settings.frontend_origin,
+        "frontend_origins": settings.frontend_origins,
+        "rag_top_k": settings.rag_top_k,
+        "rag_min_score": settings.rag_min_score,
+        "chat_model": settings.litellm_chat_model,
+        "langfuse_enabled": settings.langfuse_enabled,
+    }
+
+
 @router.post("/ingest")
 async def trigger_ingest(
     force: bool = False,
