@@ -33,7 +33,13 @@ class Settings(BaseSettings):
     # Tuned via evals/run_eval.py --sweep: 0.80 trims low-relevance chunks with
     # no recall/precision loss on the eval set (100% recall holds up to ~0.83).
     rag_min_score: float = Field(default=0.80, alias="RAG_MIN_SCORE")
+    # Single origin or a comma-separated list (e.g. apex + www domain), used as
+    # the CORS allow-list. See frontend_origins for the parsed value.
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
+
+    @property
+    def frontend_origins(self) -> list[str]:
+        return [origin.strip() for origin in self.frontend_origin.split(",") if origin.strip()]
 
     @field_validator("keepalive_token")
     @classmethod
