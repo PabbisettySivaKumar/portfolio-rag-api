@@ -91,6 +91,7 @@ control here.** Abuse is instead capped by per-IP rate limiting on `/chat`.
 - **Neo4j keepalive:** Aura reaps idle connections. The pool is hardened
   (`liveness_check_timeout`, `max_connection_lifetime`) and a cron pings
   `POST /health/neo4j` to stay warm. Transient resets self-heal via driver retry.
+  * **Troubleshooting 401 Unauthorized**: If the GitHub Actions workflow fails with a `401` error, the secret `NEO4J_KEEPALIVE_TOKEN` configured in the frontend repository settings (`siva-portfolio`) does not match the `KEEPALIVE_TOKEN` environment variable set in the Hugging Face Space settings. Both must match exactly (e.g. `aGZt4lRbKeMyfA6dQ7forI1QfDVS81Aw6kdDtpVK6UnRtiLKtLxMASCTv1qKqipE` or your custom token). Keep in mind that the backend requires the header as `Bearer <token>` (which the GitHub Action prepends automatically).
 - **Rate limit:** `/chat` is 20 req/min per IP (`app/rate_limit.py`), keyed on
   `X-Forwarded-For`. Per-container, resets on redeploy.
 - **Langfuse prompts:** managed in the Langfuse UI (EU). Seed/update from code
