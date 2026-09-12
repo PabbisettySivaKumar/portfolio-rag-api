@@ -2,6 +2,28 @@
 
 Sources: SivaKumar_Resume.pdf and public GitHub repositories at https://github.com/PabbisettySivaKumar.
 
+## Auto API-Doc Sync Agent
+
+Repository: https://github.com/PabbisettySivaKumar/auto-api-doc-agent
+
+The Auto API-Doc Sync Agent is an autonomous system that monitors codebases for API surface changes and proposes targeted documentation updates through pull requests. It runs either as a standalone local tool or as an always-on GitHub App serving multiple repositories.
+
+Capabilities:
+- Detects API changes in Python via AST parsing and in JavaScript/TypeScript via heuristics.
+- Retrieves relevant existing docs using substring matching or semantic RAG for scattered documentation.
+- Generates two-tier layered documentation with feature deep-dives and Mermaid diagrams.
+- Supports whole-repository backfill using local models, so code never leaves the machine.
+- Self-checks generated edits against the actual code to stay grounded.
+- Delivers changes via pull requests only; never auto-commits to main.
+
+Relevant technologies:
+- Python
+- FastAPI
+- PyGithub
+- Gemini API
+- Ollama
+- RAG
+
 ## Agentic RAG System with Neo4j
 
 Repository: https://github.com/PabbisettySivaKumar/GenAi-End_to_End
