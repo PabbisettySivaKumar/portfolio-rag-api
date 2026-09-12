@@ -13,7 +13,9 @@ keepalive_limiter = InMemoryRateLimiter(requests_limit=5, window_seconds=60)
 
 
 @router.get("/health")
-def health_check() -> dict[str, str]:
+def health_check(verbose: bool = False) -> dict[str, str]:
+    if verbose:
+        return {"status": "ok", "detail": "all systems operational"}
     return {"status": "ok"}
 
 
