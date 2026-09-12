@@ -6,157 +6,157 @@ _Auto-generated feature documentation for `app/`._
 
 ### GET /
 
-The "read_root" App endpoint retrieves the root-level data or configuration.
+Handles `GET /`.
 
 ### POST /chat
 
-The "chat" app endpoint facilitates real-time text-based communication between users.
+Facilitates the exchange of messages between users in a conversation.
 
 ### GET /config
 
-The "effective_config" app endpoint retrieves and returns the current configuration settings that are in effect for an application or system.
+Retrieves the currently active and resolved configuration for the application or a specific component.
 
 ### POST /feedback
 
-The "submit_feedback" app endpoint allows users to send feedback for improvement or reporting issues.
+Allows users to submit their feedback to the application.
 
 ### GET /health
 
-The "health_check" app endpoint is used to verify the operational status of the application or service it belongs to.
+It verifies the application's operational status and availability.
 
 ### POST /health/neo4j
 
-The `neo4j_keepalive` app endpoint is designed to maintain and verify the active connection between a client and a Neo4j database server by sending periodic keep-alive signals.
+This endpoint sends a keepalive signal to the Neo4j database to confirm its availability and maintain an active connection.
 
 ### POST /ingest
 
-The `trigger_ingest` app endpoint is designed to initiate data ingestion processes.
+This endpoint initiates the data ingestion process.
 
 ## Functions
 
 ### `InMemoryRateLimiter.is_rate_limited`
 
-The `is_rate_limited` function checks if an action should be rate-limited based on in-memory counters and timestamps.
+This function determines if a request has surpassed its allowed frequency within a timeframe, based on in-memory records.
 
 ### `RetrievedChunk.snippet`
 
-RetrievedChunk.snippet is a function that extracts and returns a specific segment or "chunk" of text from a larger body of text, often used for previewing or displaying parts of documents or content.
+It returns a concise, representative text excerpt from a retrieved chunk of information.
 
 ### `Settings.frontend_origins`
 
-This App function manages and configures allowed frontend origins for security settings.
+It specifies the allowed web origins (domains/URLs) from which frontend applications can connect to the backend.
 
 ### `Settings.validate_keepalive_token`
 
-The Settings.validate_keepalive_token function checks if the keep-alive token is valid and updates its expiration time accordingly.
+This function verifies the validity of a token used to maintain an active user session.
 
 ### `SimpleLRUCache.get`
 
-The `SimpleLRUCache.get` function retrieves an item from the cache using its key, updating the cache's order to maintain the most recently used items at the front.
+Retrieves an item from the cache, marking it as recently used if found.
 
 ### `SimpleLRUCache.set`
 
-The `SimpleLRUCache.set` function adds or updates an entry in the cache using the specified key and value, adhering to the Least Recently Used (LRU) eviction policy.
+Adds or updates a key-value pair in the cache, making it the most recently used and potentially evicting the least recently used item if the cache is full.
 
 ### `chunk_text`
 
-The chunk_text function splits text into smaller segments or chunks based on specified parameters such as character count or number of words.
+Breaks down a large text into smaller, more manageable segments or "chunks."
 
 ### `client_ip_from_request`
 
-The `client_ip_from_request` function extracts and returns the IP address of the client making the request.
+This function extracts the client's IP address from an incoming request.
 
 ### `close_driver`
 
-The `close_driver` function terminates or stops a driver process.
+This function shuts down a driver, ending its connection and releasing associated resources.
 
 ### `embed_text`
 
-The "embed_text" app function converts text into numerical vectors that represent its meaning for tasks like search and recommendation.
+It converts text into a numerical representation that captures its semantic meaning.
 
 ### `end_span`
 
-The "end_span" function marks the conclusion of a span or segment in a process or data flow.
+It marks the completion of a tracked operation or time segment.
 
 ### `flush_langfuse`
 
-The `flush_langfuse` app function is designed to clear or reset the Langfuse database, ensuring that all data is removed and starting fresh.
+Forces all buffered Langfuse observability and tracing data to be sent to the Langfuse platform immediately.
 
 ### `generate_answer`
 
-The "generate_answer" app function creates responses to user queries or prompts based on its programmed algorithms and data.
+It creates a relevant response to a given query or input.
 
 ### `generate_answer_stream`
 
-The `generate_answer_stream` function generates a stream of answers to a given question or prompt in real-time.
+`generate_answer_stream()` — see source for details.
 
 ### `get_client`
 
-The `get_client` function retrieves a client object for making API requests.
+`get_client()` — see source for details.
 
 ### `get_driver`
 
-The `get_driver` function retrieves a database driver based on specified connection details.
+Retrieves a configured driver instance.
 
 ### `get_prompt`
 
-The `get_prompt` function retrieves and returns a prompt based on specified criteria or parameters.
+`get_prompt()` — see source for details.
 
 ### `get_settings`
 
-The `get_settings` function retrieves user preferences or application configuration settings.
+`get_settings()` — see source for details.
 
 ### `ingest_content`
 
-The ingest_content app function processes and imports new data into a system for further analysis or storage.
+`ingest_content()` — see source for details.
 
 ### `init_langfuse`
 
-The `init_langfuse` function initializes the Langfuse library for language model evaluation and monitoring.
+`init_langfuse()` — see source for details.
 
 ### `is_portfolio_question`
 
-The `is_portfolio_question` function checks if a given question is related to a portfolio.
+`is_portfolio_question()` — see source for details.
 
 ### `langfuse_enabled`
 
-The `langfuse_enabled` function checks if language fusion is enabled in the system.
+`langfuse_enabled()` — see source for details.
 
 ### `lifespan`
 
-The Lifespan app tracks and monitors an individual's health metrics to predict and manage their longevity.
+`lifespan()` — see source for details.
 
 ### `llm_metadata`
 
-The llm_metadata app function retrieves and displays metadata related to language models.
+`llm_metadata()` — see source for details.
 
 ### `mask_pii`
 
-The `mask_pii` app function masks personally identifiable information (PII) in data to protect user privacy.
+`mask_pii()` — see source for details.
 
 ### `score_feedback`
 
-The `score_feedback` app function evaluates and assigns scores to user feedback based on predefined criteria or algorithms.
+`score_feedback()` — see source for details.
 
 ### `search_chunks`
 
-The "search_chunks" app function searches for specific data within pre-defined chunks of information.
+`search_chunks()` — see source for details.
 
 ### `seed_prompts`
 
-The seed_prompts app generates and curates initial prompts for creative writing or content creation tasks.
+`seed_prompts()` — see source for details.
 
 ### `start_span`
 
-The `start_span` function initializes and starts a new tracing span in an application's execution flow.
+`start_span()` — see source for details.
 
 ### `start_trace`
 
-The "start_trace" function initiates a performance tracing session to monitor and analyze application behavior.
+`start_trace()` — see source for details.
 
 ### `update_trace`
 
-The "update_trace" app function updates and tracks user activity logs in real-time.
+`update_trace()` — see source for details.
 
 ## Key internals
 
@@ -189,6 +189,21 @@ sequenceDiagram
     read_root->>get: get()
 ```
 
+### POST /feedback
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant submit_feedback
+    participant is_rate_limited
+    participant score_feedback
+    participant langfuse_enabled
+    Client->>submit_feedback: POST /feedback
+    submit_feedback->>is_rate_limited: is_rate_limited()
+    is_rate_limited->>score_feedback: score_feedback()
+    score_feedback->>langfuse_enabled: langfuse_enabled()
+```
+
 ### GET /health
 
 ```mermaid
@@ -215,21 +230,6 @@ sequenceDiagram
     client_ip_from_request->>get: get()
     get->>is_rate_limited: is_rate_limited()
     is_rate_limited->>get_driver: get_driver()
-```
-
-### POST /feedback
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant submit_feedback
-    participant is_rate_limited
-    participant score_feedback
-    participant langfuse_enabled
-    Client->>submit_feedback: POST /feedback
-    submit_feedback->>is_rate_limited: is_rate_limited()
-    is_rate_limited->>score_feedback: score_feedback()
-    score_feedback->>langfuse_enabled: langfuse_enabled()
 ```
 
 ### POST /chat
@@ -379,16 +379,28 @@ flowchart TD
     n6__chunk_id --> done([return])
 ```
 
-### chunk_text()
+### search_chunks()
 
 ```mermaid
 flowchart TD
-    start([chunk_text])
-    n0__split_sections[_split_sections]
-    start --> n0__split_sections
-    n1__hard_split[_hard_split]
-    n0__split_sections --> n1__hard_split
-    n1__hard_split --> done([return])
+    start([search_chunks])
+    n0_get_driver[get_driver]
+    start --> n0_get_driver
+    n0_get_driver --> done([return])
+```
+
+### is_portfolio_question()
+
+```mermaid
+flowchart TD
+    start([is_portfolio_question])
+    n0__keyword_accept[_keyword_accept]
+    start --> n0__keyword_accept
+    n1_generate_answer[generate_answer]
+    n0__keyword_accept --> n1_generate_answer
+    n2_get_prompt[get_prompt]
+    n1_generate_answer --> n2_get_prompt
+    n2_get_prompt --> done([return])
 ```
 
 ### generate_answer()
@@ -423,6 +435,18 @@ flowchart TD
     n1__stream_completion[_stream_completion]
     n0__ensure_gemini_key --> n1__stream_completion
     n1__stream_completion --> done([return])
+```
+
+### chunk_text()
+
+```mermaid
+flowchart TD
+    start([chunk_text])
+    n0__split_sections[_split_sections]
+    start --> n0__split_sections
+    n1__hard_split[_hard_split]
+    n0__split_sections --> n1__hard_split
+    n1__hard_split --> done([return])
 ```
 
 ### mask_pii()
@@ -465,30 +489,6 @@ flowchart TD
     n0_get_prompt[get_prompt]
     start --> n0_get_prompt
     n0_get_prompt --> done([return])
-```
-
-### is_portfolio_question()
-
-```mermaid
-flowchart TD
-    start([is_portfolio_question])
-    n0__keyword_accept[_keyword_accept]
-    start --> n0__keyword_accept
-    n1_generate_answer[generate_answer]
-    n0__keyword_accept --> n1_generate_answer
-    n2_get_prompt[get_prompt]
-    n1_generate_answer --> n2_get_prompt
-    n2_get_prompt --> done([return])
-```
-
-### search_chunks()
-
-```mermaid
-flowchart TD
-    start([search_chunks])
-    n0_get_driver[get_driver]
-    start --> n0_get_driver
-    n0_get_driver --> done([return])
 ```
 
 ### _condense_question()
